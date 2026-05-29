@@ -1,0 +1,6 @@
+{
+  "name": "ROBOLEG.IO",
+  "description": "High-performance interactive 2D/3D linkage mechanism builder and real-time inverse kinematics solver.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
