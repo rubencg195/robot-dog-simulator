@@ -1,12 +1,6 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Robot Dog Simulator
 
-# Run and deploy your AI Studio app
-
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/1057c725-dec1-46c1-b526-fcaa2c034288
+App available in AI Studio: https://ai.studio/apps/1057c725-dec1-46c1-b526-fcaa2c034288
 
 ## Run Locally
 
