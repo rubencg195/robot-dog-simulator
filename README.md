@@ -8,10 +8,10 @@ Preview available at:
 
 
 <p align="center">
-  <img src="./images/preview-1.png" alt="Project Screenshot" width="100%">
+  <img src="./assets/images/preview-1.png" alt="Project Screenshot" width="100%">
 </p>
 
 <p align="center">
-  <img src="./images/preview-1.gif" alt="Project Screenshot GIF" width="100%">
+  <img src="./assets/images/preview-1.gif" alt="Project Screenshot GIF" width="100%">
 </p>
 
