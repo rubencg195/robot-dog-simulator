@@ -21,6 +21,7 @@ import {
 import { Pivot, TrajectoryPoint } from '../types';
  
 interface SidebarRightProps {
+  activeTab?: 'MG996R' | 'ST3215';
   angleA1: number;
   angleA2: number;
   onAngleA1Change: (val: number) => void;
@@ -48,6 +49,7 @@ interface SidebarRightProps {
   onResetTarget: () => void;
   ikSpeed: number;
   onChangeIkSpeed: (val: number) => void;
+  originalFootPos?: { x: number; y: number } | null;
   // Limits
   limitA1Min: number;
   limitA1Max: number;
@@ -80,6 +82,7 @@ interface SidebarRightProps {
 }
  
 export default function SidebarRight({
+  activeTab = 'MG996R',
   angleA1,
   angleA2,
   onAngleA1Change,
@@ -103,6 +106,7 @@ export default function SidebarRight({
   onResetTarget,
   ikSpeed,
   onChangeIkSpeed,
+  originalFootPos,
   limitA1Min,
   limitA1Max,
   limitA2Min,
@@ -143,6 +147,34 @@ export default function SidebarRight({
   const [localLimitA1Max, setLocalLimitA1Max] = useState(String(limitA1Max));
   const [localLimitA2Min, setLocalLimitA2Min] = useState(String(limitA2Min));
   const [localLimitA2Max, setLocalLimitA2Max] = useState(String(limitA2Max));
+
+  const [localSpeedStr, setLocalSpeedStr] = useState(String(ikSpeed));
+
+  useEffect(() => {
+    setLocalSpeedStr(String(ikSpeed));
+  }, [ikSpeed]);
+
+  const handleLocalSpeedChange = (valStr: string) => {
+    setLocalSpeedStr(valStr);
+    const parsed = parseFloat(valStr);
+    if (!isNaN(parsed) && parsed >= 5 && parsed <= 500) {
+      onChangeIkSpeed(parsed);
+    }
+  };
+
+  const handleSpeedBlur = () => {
+    const parsed = parseFloat(localSpeedStr);
+    if (isNaN(parsed) || parsed < 5) {
+      onChangeIkSpeed(5);
+      setLocalSpeedStr("5");
+    } else if (parsed > 500) {
+      onChangeIkSpeed(500);
+      setLocalSpeedStr("500");
+    } else {
+      onChangeIkSpeed(parsed);
+      setLocalSpeedStr(String(parsed));
+    }
+  };
 
   // Keep local values in sync when angle changes from sliders or IK/Gait loops
   useEffect(() => {
@@ -338,8 +370,9 @@ export default function SidebarRight({
       // Jacobian elements for F_y (vertical load):
       // J_12 (dY/d_theta2) = L_femur * cos(theta2)
       // J_22 (dY/d_chank) = - L_femur * cos(psi_chank)
-      const J_12 = 60 * Math.cos(t2_rad);
-      const J_22 = -60 * Math.cos(psi_chank);
+      const L_femur = dimensions?.L_femur_servo ?? 60.0;
+      const J_12 = L_femur * Math.cos(t2_rad);
+      const J_22 = -L_femur * Math.cos(psi_chank);
 
       // Torque = J^T * F_col. Since F_x = 0, and F_y = -testPayload (in N):
       // Torques are in N*mm. Divide by 1000 to get N*m (Newton-meters)
@@ -348,10 +381,12 @@ export default function SidebarRight({
     }
   }
 
-  // Clamping torque percentage (max rated servo capacity = 1.6 N*m)
-  const maxRatedTorque = 3.6;
-  const torqueA1Pct = Math.min(100, (torqueA1 / maxRatedTorque) * 100);
-  const torqueA2Pct = Math.min(100, (torqueA2 / maxRatedTorque) * 100);
+  // Clamping torque percentage (max rated MG996R / ST3215 capacity)
+  const torqueA1KgCm = torqueA1 * 10.19716;
+  const torqueA2KgCm = torqueA2 * 10.19716;
+  const maxRatedTorqueKgCm = activeTab === 'ST3215' ? 30.0 : 11.0;
+  const torqueA1Pct = Math.min(100, (torqueA1KgCm / maxRatedTorqueKgCm) * 100);
+  const torqueA2Pct = Math.min(100, (torqueA2KgCm / maxRatedTorqueKgCm) * 100);
 
   return (
     <div className="w-80 bg-sleek-aside border-l border-sleek-border flex flex-col h-full text-sleek-text" id="sidebar-right-root">
@@ -362,7 +397,7 @@ export default function SidebarRight({
         </div>
         <div>
           <h1 className="text-xs font-bold tracking-wider text-sleek-text uppercase">TELEMETRY & CONTROLS</h1>
-          <p className="text-[10px] text-sleek-text-muted font-mono mt-0.5 uppercase tracking-widest">ACTUATOR DRIVERS ST-40</p>
+          <p className="text-[10px] text-sleek-text-muted font-mono mt-0.5 uppercase tracking-widest">ACTUATOR DRIVERS {activeTab}</p>
         </div>
       </div>
 
@@ -434,11 +469,10 @@ export default function SidebarRight({
               </span>
               <div className="flex items-center gap-1">
                 <input
-                  type="number"
-                  min="5"
-                  max="500"
-                  value={ikSpeed}
-                  onChange={(e) => onChangeIkSpeed(Math.max(5, Math.min(500, Number(e.target.value) || 5)))}
+                  type="text"
+                  value={localSpeedStr}
+                  onChange={(e) => handleLocalSpeedChange(e.target.value)}
+                  onBlur={handleSpeedBlur}
                   className="w-12 text-center bg-sleek-subcard border border-sleek-border/80 rounded py-0.5 text-xs text-emerald-500 font-bold font-mono focus:outline-none focus:border-emerald-500"
                 />
                 <span className="text-[10px] text-sleek-text-muted font-mono">mm/s</span>
@@ -461,6 +495,39 @@ export default function SidebarRight({
               <span>Limit (300)</span>
             </div>
           </div>
+
+          {/* Real-time Toe Tip Translation Telemetry */}
+          {hasTarget && originalFootPos && solvedPositions && solvedPositions['P_foot'] && (
+            <div className="p-3 bg-slate-100/40 dark:bg-slate-800/20 border border-sleek-border/40 rounded-xl space-y-2 font-mono text-xs">
+              <div className="text-[10px] text-sleek-text-muted/80 uppercase tracking-wider font-sans font-bold flex items-center gap-1.5 border-b border-sleek-border/30 pb-1.5 mb-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Toe Tip Translation Telemetry
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-sleek-subcard border border-sleek-border/30 rounded p-1.5 text-center">
+                  <div className="text-[8px] text-orange-500 font-bold uppercase tracking-wide">ΔX (Horiz)</div>
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-100 mt-0.5">
+                    {(solvedPositions['P_foot'].x - originalFootPos.x).toFixed(1)} <span className="text-[8px] font-normal text-slate-400">mm</span>
+                  </div>
+                </div>
+                <div className="bg-sleek-subcard border border-sleek-border/30 rounded p-1.5 text-center">
+                  <div className="text-[8px] text-cyan-500 font-bold uppercase tracking-wide">ΔY (Vert)</div>
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-100 mt-0.5">
+                    {(solvedPositions['P_foot'].y - originalFootPos.y).toFixed(1)} <span className="text-[8px] font-normal text-slate-400">mm</span>
+                  </div>
+                </div>
+                <div className="bg-sleek-subcard border border-sleek-border/30 rounded p-1.5 text-center">
+                  <div className="text-[8px] text-pink-500 font-bold uppercase tracking-wide">ΔC (Total)</div>
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-100 mt-0.5">
+                    {Math.hypot(
+                      solvedPositions['P_foot'].x - originalFootPos.x,
+                      solvedPositions['P_foot'].y - originalFootPos.y
+                    ).toFixed(1)} <span className="text-[8px] font-normal text-slate-400">mm</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Actuator Origins/Coordinates configuration block */}
           <div className="p-3 bg-slate-100/40 dark:bg-slate-800/20 border border-sleek-border/40 rounded-xl space-y-3">
@@ -550,7 +617,7 @@ export default function SidebarRight({
             {/* Actuator A1 Slider */}
             <div className="space-y-2 text-xs font-mono">
               <div className="flex justify-between items-center">
-                <span className="text-sleek-text/80 font-semibold font-sans">Tibia Actuator (A1)</span>
+                <span className="text-sleek-text/80 font-semibold font-sans">MG996R Tibia Servo (A1)</span>
                 <div className="flex items-center gap-0.5 font-mono text-sleek-blue border border-sleek-border px-1.5 rounded-md py-0.5 font-bold bg-sleek-subcard shadow-sm hover:border-sleek-border/80 focus-within:border-sleek-blue transition-all">
                   <input
                     type="text"
@@ -618,7 +685,7 @@ export default function SidebarRight({
             {/* Actuator A2 Slider */}
             <div className="space-y-2 text-xs font-mono">
               <div className="flex justify-between items-center">
-                <span className="text-sleek-text/80 font-semibold font-sans">Femur Actuator (A2)</span>
+                <span className="text-sleek-text/80 font-semibold font-sans">MG996R Femur Servo (A2)</span>
                 <div className="flex items-center gap-0.5 font-mono text-sleek-blue border border-sleek-border px-1.5 rounded-md py-0.5 font-bold bg-sleek-subcard shadow-sm hover:border-sleek-border/80 focus-within:border-sleek-blue transition-all">
                   <input
                     type="text"
@@ -935,8 +1002,8 @@ export default function SidebarRight({
             {/* Torque A1 */}
             <div className="p-3 bg-sleek-subcard/50 border border-sleek-border rounded-xl shadow-inner">
               <div className="flex justify-between text-[11px] text-sleek-text-muted mb-1.5">
-                <span>Joint ID 41 (A1) torque:</span>
-                <span className="font-bold text-sleek-text">{torqueA1.toFixed(3)} N·m</span>
+                <span>Servo {activeTab} A1 (ID 41) torque:</span>
+                <span className="font-bold text-sleek-text">{torqueA1KgCm.toFixed(2)} kg·cm ({torqueA1.toFixed(3)} N·m)</span>
               </div>
               <div className="w-full h-2 bg-sleek-border rounded-full overflow-hidden shadow-inner">
                 <div
@@ -951,8 +1018,8 @@ export default function SidebarRight({
             {/* Torque A2 */}
             <div className="p-3 bg-sleek-subcard/50 border border-sleek-border rounded-xl shadow-inner">
               <div className="flex justify-between text-[11px] text-sleek-text-muted mb-1.5">
-                <span>Joint ID 42 (A2) torque:</span>
-                <span className="font-bold text-sleek-text">{torqueA2.toFixed(3)} N·m</span>
+                <span>Servo {activeTab} A2 (ID 42) torque:</span>
+                <span className="font-bold text-sleek-text">{torqueA2KgCm.toFixed(2)} kg·cm ({torqueA2.toFixed(3)} N·m)</span>
               </div>
               <div className="w-full h-2 bg-sleek-border rounded-full overflow-hidden shadow-inner">
                 <div
@@ -965,7 +1032,7 @@ export default function SidebarRight({
             </div>
           </div>
           <span className="text-[10px] text-sleek-text-muted italic font-mono leading-normal pl-2 border-l border-sleek-border block">
-            Calculated torque vector represents static hold equilibrium: <span className="font-bold italic">τ = Jᵀ · F_load</span>. Max continuous limit: 3.6 N·m.
+            Calculated torque vector represents static hold equilibrium: <span className="font-bold italic">τ = Jᵀ · F_load</span>. Max continuous holding limit: {activeTab === 'ST3215' ? '30.0 kg·cm (2.942 N·m) based on ST3215' : '11.0 kg·cm (1.078 N·m) based on MG996R'} servo specs.
           </span>
         </div>
       </div>

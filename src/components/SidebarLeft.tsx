@@ -98,7 +98,10 @@ export default function SidebarLeft({
         </div>
         <div>
           <h1 className="text-xs font-bold tracking-wider text-sleek-text uppercase">PROPERTIES & SPEC</h1>
-          <p className="text-[10px] text-sleek-text-muted font-mono mt-0.5 uppercase tracking-widest">ROBOLEG DESIGN ENGINE</p>
+          <p className="text-[10px] text-sleek-text-muted font-mono mt-0.5 uppercase tracking-widest">ROBOT DOG SIMULATOR</p>
+          <p className="text-[9px] text-sleek-text-muted/90 font-mono mt-0.5 uppercase tracking-wider font-semibold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-sleek-blue" /> Watt Six-Bar Linkage Mechanism
+          </p>
         </div>
       </div>
 
@@ -179,7 +182,7 @@ export default function SidebarLeft({
             <div className="p-4 border border-sleek-border bg-sleek-subcard rounded-xl shadow-sm">
               <span className="text-[11px] text-sleek-blue font-bold block uppercase tracking-wider font-mono">Design Insight</span>
               <p className="text-[11px] text-sleek-text/70 mt-1.5 leading-relaxed">
-                Notice that the triangular **Chank** shares the pivot point A2 with the **Femur Servo Link**, but they rotate independently. This allows dual actuator decoupling similar to the MIT Cheetah and Ghost Robotics legs.
+                This mechanism represents a modular variant of the **Watt II six-bar linkage**, where the ternary linkage serves as an intermediate coupler. This integrates a decoupling stage that converts the dual chassis-mounted actuator rotations into isolated knee/ankle trajectories, completely removing motor masses from the moving legs.
               </p>
             </div>
           </div>
@@ -307,10 +310,10 @@ export default function SidebarLeft({
                   />
                 </div>
 
-                {/* Chank Left Side */}
+                {/* Ternary Linkage Left Side */}
                 <div className="space-y-2 p-3 bg-sleek-subcard border border-sleek-border/60 rounded-xl hover:border-sleek-border transition-all shadow-sm">
                   <div className="flex justify-between items-center text-xs text-sleek-text">
-                    <span className="font-medium">Chank Left Leg (L_chank_left)</span>
+                    <span className="font-medium">Ternary Linkage Left (L_chank_left)</span>
                     <input
                       type="number"
                       step="0.01"
@@ -330,10 +333,10 @@ export default function SidebarLeft({
                   />
                 </div>
 
-                {/* Chank Right Side */}
+                {/* Ternary Linkage Right Side */}
                 <div className="space-y-2 p-3 bg-sleek-subcard border border-sleek-border/60 rounded-xl hover:border-sleek-border transition-all shadow-sm">
                   <div className="flex justify-between items-center text-xs text-sleek-text">
-                    <span className="font-medium">Chank Right Leg (L_chank_right)</span>
+                    <span className="font-medium">Ternary Linkage Right (L_chank_right)</span>
                     <input
                       type="number"
                       step="0.01"
@@ -353,10 +356,10 @@ export default function SidebarLeft({
                   />
                 </div>
 
-                {/* Chank Top Side */}
+                {/* Ternary Linkage Top Side */}
                 <div className="space-y-2 p-3 bg-sleek-subcard border border-sleek-border/60 rounded-xl hover:border-sleek-border transition-all shadow-sm">
                   <div className="flex justify-between items-center text-xs text-sleek-text">
-                    <span className="font-medium">Chank Top Base (L_chank_top)</span>
+                    <span className="font-medium">Ternary Linkage Top (L_chank_top)</span>
                     <input
                       type="number"
                       step="0.01"
@@ -444,7 +447,7 @@ export default function SidebarLeft({
                     className="w-full accent-sleek-blue cursor-pointer"
                   />
                   <span className="text-[10px] text-sleek-text-muted italic font-mono leading-tight block mt-1">
-                    Must coordinate with Chank Left Leg (current: {dimensions.L_chank_left} mm) to maintain flawless parallelogram alignment.
+                    Must coordinate with Ternary Linkage Left (current: {dimensions.L_chank_left} mm) to maintain flawless parallelogram alignment.
                   </span>
                 </div>
 
@@ -464,13 +467,13 @@ export default function SidebarLeft({
                     Computed as <code className="text-amber-500 font-mono">√(dx² + dy²)</code> from {dimensions.dx_actuators}mm horiz. &amp; {dimensions.dy_actuators}mm vert. offsets.
                   </div>
 
-                  {/* Chank top edge reference */}
+                  {/* Ternary top edge reference */}
                   <div className="flex items-center justify-between text-xs font-mono pt-1">
-                    <span className="text-sleek-text/70">Chank Triangle Top Base:</span>
+                    <span className="text-sleek-text/70">Ternary Linkage Top:</span>
                     <span className="text-sleek-text font-bold">({dimensions.L_chank_top.toFixed(1)} mm)</span>
                   </div>
                   <div className="text-[10px] text-sleek-text-muted leading-normal pl-2 border-l border-sleek-border font-mono">
-                    Calculated for custom Chank triangle geometry.
+                    Calculated for custom ternary linkage triangle geometry.
                   </div>
 
                   {/* Parallel reference */}
@@ -483,7 +486,7 @@ export default function SidebarLeft({
                     )}
                   </div>
                   <div className="text-[10px] text-sleek-text-muted leading-normal pl-2 border-l border-sleek-border font-mono">
-                    The Tibia parallel offset ({dimensions.L_tibia_offset}mm) must equal Chank left leg ({dimensions.L_chank_left}mm) to avoid shear stresses.
+                    The Tibia parallel offset ({dimensions.L_tibia_offset}mm) must equal Ternary Linkage left leg ({dimensions.L_chank_left}mm) to avoid shear stresses.
                   </div>
                 </div>
               </div>

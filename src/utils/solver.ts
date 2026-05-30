@@ -259,7 +259,7 @@ export function solveDefaultLegIK(
     return null;
   }
 
-  // Choose the intersection that yields an actuator angle closest to the physical operating home region (~131.5)
+  // Choose the intersection that yields an actuator angle closest to the physical operating home region (~135.0)
   // This guarantees that we don't snap to the alternate symmetry branch which is upside down.
   const [xP1_1, yP1_1, xP1_2, yP1_2] = isectP1;
   const theta1_rad_1 = Math.atan2(yP1_1 - a1y, xP1_1 - a1x);
@@ -268,8 +268,8 @@ export function solveDefaultLegIK(
   const theta1_rad_2 = Math.atan2(yP1_2 - a1y, xP1_2 - a1x);
   const theta1_deg_2 = (theta1_rad_2 * 180) / Math.PI;
 
-  const diff1 = Math.abs(theta1_deg_1 - 131.5);
-  const diff2 = Math.abs(theta1_deg_2 - 131.5);
+  const diff1 = Math.abs(theta1_deg_1 - 135.0);
+  const diff2 = Math.abs(theta1_deg_2 - 135.0);
 
   const theta1_deg = diff1 < diff2 ? theta1_deg_1 : theta1_deg_2;
 

@@ -133,108 +133,361 @@ export default function App() {
     localStorage.setItem('app-theme', theme);
   }, [theme]);
 
+  const [activeTab, setActiveTab] = useState<'MG996R' | 'ST3215'>(() => {
+    const saved = localStorage.getItem('simulate_io_activeTab');
+    return (saved === 'ST3215' || saved === 'MG996R') ? (saved as 'MG996R' | 'ST3215') : 'MG996R';
+  });
+
+  const getTabDefaults = (tab: 'MG996R' | 'ST3215') => {
+    if (tab === 'MG996R') {
+      return {
+        preset: 'parallelogram_leg' as MechanismPresetType,
+        dimensions: DEFAULT_DIMENSIONS,
+        angleA1: 135.0,
+        angleA2: -45.0,
+        homeA1: 135.0,
+        homeA2: -45.0,
+        limitA1Min: 90,
+        limitA1Max: 180,
+        limitA2Min: -90,
+        limitA2Max: 0,
+        pivots: [] as Pivot[],
+        links: [] as Link[],
+        customDimensions: [] as CustomDimension[],
+        constructionLines: DEFAULT_CONSTRUCTION_LINES,
+        angleDimensions: DEFAULT_ANGLE_DIMENSIONS,
+        labelOffsets: {} as Record<string, { dx: number; dy: number }>,
+        gaitWaypoints: [
+          { id: 'gw-1', x: -5, y: -64 },
+          { id: 'gw-2', x: 20, y: -64 },
+          { id: 'gw-3', x: 45, y: -64 },
+          { id: 'gw-4', x: 35, y: -48 },
+          { id: 'gw-5', x: 20, y: -42 },
+          { id: 'gw-6', x: 5, y: -48 },
+        ],
+        trajectory: [] as TrajectoryPoint[],
+      };
+    } else {
+      const stDimensions = {
+        ...DEFAULT_DIMENSIONS,
+        L_femur_servo: 130.0,
+        L_rear_tibia: 130.0,
+        L_tibia_total: 130.0,
+      };
+      return {
+        preset: 'parallelogram_leg' as MechanismPresetType,
+        dimensions: stDimensions,
+        angleA1: 135.0,
+        angleA2: -45.0,
+        homeA1: 135.0,
+        homeA2: -45.0,
+        limitA1Min: 90,
+        limitA1Max: 180,
+        limitA2Min: -90,
+        limitA2Max: 0,
+        pivots: [] as Pivot[],
+        links: [] as Link[],
+        customDimensions: [] as CustomDimension[],
+        constructionLines: DEFAULT_CONSTRUCTION_LINES,
+        angleDimensions: DEFAULT_ANGLE_DIMENSIONS,
+        labelOffsets: {} as Record<string, { dx: number; dy: number }>,
+        gaitWaypoints: [
+          { id: 'gw-1', x: -5, y: -134 }, 
+          { id: 'gw-2', x: 20, y: -134 },
+          { id: 'gw-3', x: 45, y: -134 },
+          { id: 'gw-4', x: 35, y: -118 },
+          { id: 'gw-5', x: 20, y: -112 },
+          { id: 'gw-6', x: 5, y: -118 },
+        ],
+        trajectory: [] as TrajectoryPoint[],
+      };
+    }
+  };
+
+  const getTabValue = (tab: 'MG996R' | 'ST3215', key: string, defaultValue: any) => {
+    const keyWithTab = `simulate_io_${tab}_${key}`;
+    const savedWithTab = localStorage.getItem(keyWithTab);
+    if (savedWithTab !== null) {
+      try {
+        const parsed = JSON.parse(savedWithTab);
+        if (key === 'dimensions' && parsed && parsed.L_chank_leg !== undefined) {
+          if (parsed.L_chank_left === undefined) parsed.L_chank_left = parsed.L_chank_leg;
+          if (parsed.L_chank_right === undefined) parsed.L_chank_right = parsed.L_chank_leg;
+          if (parsed.L_chank_top === undefined) parsed.L_chank_top = Number((parsed.L_chank_leg * Math.sqrt(2)).toFixed(1));
+        }
+        if ((key === 'angleA1' || key === 'homeA1') && typeof parsed === 'number' && Math.abs(parsed - 131.5) < 0.2) {
+          return 135.0;
+        }
+        if ((key === 'angleA2' || key === 'homeA2') && typeof parsed === 'number' && Math.abs(parsed - (-48.0)) < 0.2) {
+          return -45.0;
+        }
+        return parsed;
+      } catch {
+        let val: any = savedWithTab;
+        if (!isNaN(Number(savedWithTab)) && savedWithTab.trim() !== '') {
+          val = Number(savedWithTab);
+        }
+        if ((key === 'angleA1' || key === 'homeA1') && typeof val === 'number' && Math.abs(val - 131.5) < 0.2) {
+          return 135.0;
+        }
+        if ((key === 'angleA2' || key === 'homeA2') && typeof val === 'number' && Math.abs(val - (-48.0)) < 0.2) {
+          return -45.0;
+        }
+        return val;
+      }
+    }
+
+    if (tab === 'MG996R') {
+      const legacyKey = `simulate_io_${key}`;
+      const legacySaved = localStorage.getItem(legacyKey);
+      if (legacySaved !== null) {
+        try {
+          const parsed = JSON.parse(legacySaved);
+          if (key === 'dimensions' && parsed && parsed.L_chank_leg !== undefined) {
+            if (parsed.L_chank_left === undefined) parsed.L_chank_left = parsed.L_chank_leg;
+            if (parsed.L_chank_right === undefined) parsed.L_chank_right = parsed.L_chank_leg;
+            if (parsed.L_chank_top === undefined) parsed.L_chank_top = Number((parsed.L_chank_leg * Math.sqrt(2)).toFixed(1));
+          }
+          if ((key === 'angleA1' || key === 'homeA1') && typeof parsed === 'number' && Math.abs(parsed - 131.5) < 0.2) {
+            return 135.0;
+          }
+          if ((key === 'angleA2' || key === 'homeA2') && typeof parsed === 'number' && Math.abs(parsed - (-48.0)) < 0.2) {
+            return -45.0;
+          }
+          return parsed;
+        } catch {
+          let val: any = legacySaved;
+          if (!isNaN(Number(legacySaved)) && legacySaved.trim() !== '') {
+            val = Number(legacySaved);
+          }
+          if ((key === 'angleA1' || key === 'homeA1') && typeof val === 'number' && Math.abs(val - 131.5) < 0.2) {
+            return 135.0;
+          }
+          if ((key === 'angleA2' || key === 'homeA2') && typeof val === 'number' && Math.abs(val - (-48.0)) < 0.2) {
+            return -45.0;
+          }
+          return val;
+        }
+      }
+    }
+
+    return defaultValue;
+  };
+
+  const generateDefaultPivotsAndLinks = (tab: 'MG996R' | 'ST3215', dims: typeof DEFAULT_DIMENSIONS) => {
+    const a1_x = dims.a1x !== undefined ? dims.a1x : 0.0;
+    const a1_y = dims.a1y !== undefined ? dims.a1y : 0.0;
+    const a2_x = dims.a2x !== undefined ? dims.a2x : dims.dx_actuators;
+    const a2_y = dims.a2y !== undefined ? dims.a2y : dims.dy_actuators;
+
+    const startResult = solveDefaultLeg(135.0, -45.0, dims);
+
+    const servoName1 = tab === 'ST3215' ? 'Servo ST3215 A1 (ID 41)' : 'Servo MG996R A1 (ID 41)';
+    const servoName2 = tab === 'ST3215' ? 'Servo ST3215 A2 (ID 42)' : 'Servo MG996R A2 (ID 42)';
+
+    const initialPivots: Pivot[] = [
+      { id: 'A1', name: servoName1, type: 'actuator', x: a1_x, y: a1_y, z: 0, actuatorId: 'A1' },
+      { id: 'A2', name: servoName2, type: 'actuator', x: a2_x, y: a2_y, z: 0, actuatorId: 'A2' },
+      { 
+        id: 'P1', 
+        name: 'Tibia Servo Pin P1', 
+        type: 'free', 
+        x: startResult ? startResult.P1.x : a1_x + dims.L_tibia_servo * Math.cos(-Math.PI/4), 
+        y: startResult ? startResult.P1.y : a1_y + dims.L_tibia_servo * Math.sin(-Math.PI/4), 
+        z: 1.5 
+      },
+      { 
+        id: 'P2', 
+        name: 'Femur Servo Pin P2', 
+        type: 'free', 
+        x: startResult ? startResult.P2.x : a2_x + dims.L_femur_servo * Math.cos(Math.PI/4), 
+        y: startResult ? startResult.P2.y : a2_y + dims.L_femur_servo * Math.sin(Math.PI/4), 
+        z: 4.5 
+      },
+      { 
+        id: 'P_chank_TL', 
+        name: 'Ternary Linkage Top-Left Joint', 
+        type: 'free', 
+        x: startResult ? startResult.P_chank_TL.x : a2_x - 16.5, 
+        y: startResult ? startResult.P_chank_TL.y : a2_y + 16.5, 
+        z: 2.5 
+      },
+      { 
+        id: 'P_chank_TR', 
+        name: 'Ternary Linkage Top-Right Joint', 
+        type: 'free', 
+        x: startResult ? startResult.P_chank_TR.x : a2_x + 16.5, 
+        y: startResult ? startResult.P_chank_TR.y : a2_y + 16.5, 
+        z: 2.5 
+      },
+      { 
+        id: 'P_tibia_rear', 
+        name: 'Tibia Link Rear Pin', 
+        type: 'free', 
+        x: startResult ? startResult.P_tibia_rear.x : a2_x + 30, 
+        y: startResult ? startResult.P_tibia_rear.y : a2_y - 41, 
+        z: 2.5 
+      },
+      { 
+        id: 'P_foot', 
+        name: 'Tibia Foot Tip', 
+        type: 'free', 
+        x: startResult ? startResult.P_foot.x : a2_x + 50, 
+        y: startResult ? startResult.P_foot.y : a2_y - 81, 
+        z: 3.5 
+      },
+    ];
+
+    const initialLinks: Link[] = [
+      { id: 'l_tibia_servo', name: 'Tibia Servo Link', pivotIds: ['A1', 'P1'], color: '#ef4444', thickness: 4 },
+      { id: 'l_second_tibia', name: 'Second Tibia Link', pivotIds: ['P1', 'P_chank_TL'], color: '#38bdf8', thickness: 3 },
+      { id: 'l_femur', name: 'Femur Servo Link', pivotIds: ['A2', 'P2'], color: '#737373', thickness: 5 },
+      { id: 'l_chank', name: 'Ternary Linkage', pivotIds: ['A2', 'P_chank_TL', 'P_chank_TR'], color: '#f59e0b', thickness: 3, isTriangle: true },
+      { id: 'l_rear_tibia', name: 'Rear Tibia Link', pivotIds: ['P_chank_TR', 'P_tibia_rear'], color: '#8b5cf6', thickness: 3 },
+      { id: 'l_tibia', name: 'Tibia Link', pivotIds: ['P_tibia_rear', 'P2', 'P_foot'], color: '#10b981', thickness: 4 },
+    ];
+
+    return { pivots: initialPivots, links: initialLinks };
+  };
+
+  const isSwitchingTabRef = useRef(false);
+
+  const initialActiveTab = (() => {
+    const saved = localStorage.getItem('simulate_io_activeTab');
+    return (saved === 'ST3215' || saved === 'MG996R') ? (saved as 'MG996R' | 'ST3215') : 'MG996R';
+  })();
+
+  const handleTabChange = (newTab: 'MG996R' | 'ST3215') => {
+    if (newTab === activeTab) return;
+
+    const currentTab = activeTab;
+    localStorage.setItem(`simulate_io_${currentTab}_preset`, preset);
+    localStorage.setItem(`simulate_io_${currentTab}_angleA1`, String(angleA1));
+    localStorage.setItem(`simulate_io_${currentTab}_angleA2`, String(angleA2));
+    localStorage.setItem(`simulate_io_${currentTab}_homeA1`, String(homeA1));
+    localStorage.setItem(`simulate_io_${currentTab}_homeA2`, String(homeA2));
+    localStorage.setItem(`simulate_io_${currentTab}_dimensions`, JSON.stringify(dimensions));
+    localStorage.setItem(`simulate_io_${currentTab}_pivots`, JSON.stringify(pivots));
+    localStorage.setItem(`simulate_io_${currentTab}_links`, JSON.stringify(links));
+    localStorage.setItem(`simulate_io_${currentTab}_labelOffsets`, JSON.stringify(labelOffsets));
+    localStorage.setItem(`simulate_io_${currentTab}_customDimensions`, JSON.stringify(customDimensions));
+    localStorage.setItem(`simulate_io_${currentTab}_constructionLines`, JSON.stringify(constructionLines));
+    localStorage.setItem(`simulate_io_${currentTab}_angleDimensions`, JSON.stringify(angleDimensions));
+    localStorage.setItem(`simulate_io_${currentTab}_limitA1Min`, String(limitA1Min));
+    localStorage.setItem(`simulate_io_${currentTab}_limitA1Max`, String(limitA1Max));
+    localStorage.setItem(`simulate_io_${currentTab}_limitA2Min`, String(limitA2Min));
+    localStorage.setItem(`simulate_io_${currentTab}_limitA2Max`, String(limitA2Max));
+    localStorage.setItem(`simulate_io_${currentTab}_gaitWaypoints`, JSON.stringify(gaitWaypoints));
+    localStorage.setItem(`simulate_io_${currentTab}_trajectory`, JSON.stringify(trajectory));
+    localStorage.setItem(`simulate_io_${currentTab}_ikSpeed`, String(ikSpeed));
+
+    isSwitchingTabRef.current = true;
+
+    setActiveTab(newTab);
+    localStorage.setItem('simulate_io_activeTab', newTab);
+
+    const defaults = getTabDefaults(newTab);
+    const newPreset = getTabValue(newTab, 'preset', defaults.preset);
+    const newAngleA1 = getTabValue(newTab, 'angleA1', defaults.angleA1);
+    const newAngleA2 = getTabValue(newTab, 'angleA2', defaults.angleA2);
+    const newHomeA1 = getTabValue(newTab, 'homeA1', defaults.homeA1);
+    const newHomeA2 = getTabValue(newTab, 'homeA2', defaults.homeA2);
+    const newDimensions = getTabValue(newTab, 'dimensions', defaults.dimensions);
+    const newLabelOffsets = getTabValue(newTab, 'labelOffsets', defaults.labelOffsets);
+    const newCustomDimensions = getTabValue(newTab, 'customDimensions', defaults.customDimensions);
+    const newConstructionLines = getTabValue(newTab, 'constructionLines', defaults.constructionLines);
+    const newAngleDimensions = getTabValue(newTab, 'angleDimensions', defaults.angleDimensions);
+    const newLimitA1Min = getTabValue(newTab, 'limitA1Min', defaults.limitA1Min);
+    const newLimitA1Max = getTabValue(newTab, 'limitA1Max', defaults.limitA1Max);
+    const newLimitA2Min = getTabValue(newTab, 'limitA2Min', defaults.limitA2Min);
+    const newLimitA2Max = getTabValue(newTab, 'limitA2Max', defaults.limitA2Max);
+    const newGaitWaypoints = getTabValue(newTab, 'gaitWaypoints', defaults.gaitWaypoints);
+    const newTrajectory = getTabValue(newTab, 'trajectory', defaults.trajectory);
+    const newIkSpeed = getTabValue(newTab, 'ikSpeed', 20);
+
+    let newPivots = getTabValue(newTab, 'pivots', null);
+    let newLinks = getTabValue(newTab, 'links', null);
+    if (!newPivots || newPivots.length === 0 || !newLinks || newLinks.length === 0) {
+      const generated = generateDefaultPivotsAndLinks(newTab, newDimensions);
+      newPivots = generated.pivots;
+      newLinks = generated.links;
+    }
+
+    setPreset(newPreset);
+    setAngleA1(newAngleA1);
+    setAngleA2(newAngleA2);
+    setHomeA1(newHomeA1);
+    setHomeA2(newHomeA2);
+    setDimensions(newDimensions);
+    setLabelOffsets(newLabelOffsets);
+    setCustomDimensions(newCustomDimensions);
+    setConstructionLines(newConstructionLines);
+    setAngleDimensions(newAngleDimensions);
+    setLimitA1Min(newLimitA1Min);
+    setLimitA1Max(newLimitA1Max);
+    setLimitA2Min(newLimitA2Min);
+    setLimitA2Max(newLimitA2Max);
+    setGaitWaypoints(newGaitWaypoints);
+    setTrajectory(newTrajectory);
+    setIkSpeed(newIkSpeed);
+    setPivots(newPivots);
+    setLinks(newLinks);
+
+    setSelectedWaypointId('gw-1');
+    setIkActive(false);
+    setTargetIK(null);
+    setCurrentIK(null);
+
+    setTimeout(() => {
+      isSwitchingTabRef.current = false;
+    }, 100);
+  };
+
   const [preset, setPreset] = useState<MechanismPresetType>(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedPreset = localStorage.getItem('simulate_io_preset');
-      if (savedPreset) return savedPreset as MechanismPresetType;
-    }
-    return 'parallelogram_leg';
+    return getTabValue(initialActiveTab, 'preset', getTabDefaults(initialActiveTab).preset);
   });
 
-  const [angleA1, setAngleA1] = useState(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedVal = localStorage.getItem('simulate_io_angleA1');
-      if (savedVal !== null) return Number(savedVal);
-    }
-    return 135.0;
+  const [angleA1, setAngleA1] = useState<number>(() => {
+    return getTabValue(initialActiveTab, 'angleA1', getTabDefaults(initialActiveTab).angleA1);
   });
 
-  const [angleA2, setAngleA2] = useState(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedVal = localStorage.getItem('simulate_io_angleA2');
-      if (savedVal !== null) return Number(savedVal);
-    }
-    return -45.0;
+  const [angleA2, setAngleA2] = useState<number>(() => {
+    return getTabValue(initialActiveTab, 'angleA2', getTabDefaults(initialActiveTab).angleA2);
   });
 
   // Home Positions
-  const [homeA1, setHomeA1] = useState(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedVal = localStorage.getItem('simulate_io_homeA1');
-      if (savedVal !== null) return Number(savedVal);
-    }
-    return 135.0;
+  const [homeA1, setHomeA1] = useState<number>(() => {
+    return getTabValue(initialActiveTab, 'homeA1', getTabDefaults(initialActiveTab).homeA1);
   });
 
-  const [homeA2, setHomeA2] = useState(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedVal = localStorage.getItem('simulate_io_homeA2');
-      if (savedVal !== null) return Number(savedVal);
-    }
-    return -45.0;
+  const [homeA2, setHomeA2] = useState<number>(() => {
+    return getTabValue(initialActiveTab, 'homeA2', getTabDefaults(initialActiveTab).homeA2);
   });
 
   // Actuator Angle Limits
-  const [limitA1Min, setLimitA1Min] = useState(() => {
-    const saved = localStorage.getItem('simulate_io_limitA1Min');
-    return saved !== null ? Number(saved) : 90;
+  const [limitA1Min, setLimitA1Min] = useState<number>(() => {
+    return getTabValue(initialActiveTab, 'limitA1Min', getTabDefaults(initialActiveTab).limitA1Min);
   });
-  const [limitA1Max, setLimitA1Max] = useState(() => {
-    const saved = localStorage.getItem('simulate_io_limitA1Max');
-    return saved !== null ? Number(saved) : 180;
+  const [limitA1Max, setLimitA1Max] = useState<number>(() => {
+    return getTabValue(initialActiveTab, 'limitA1Max', getTabDefaults(initialActiveTab).limitA1Max);
   });
-  const [limitA2Min, setLimitA2Min] = useState(() => {
-    const saved = localStorage.getItem('simulate_io_limitA2Min');
-    return saved !== null ? Number(saved) : -90;
+  const [limitA2Min, setLimitA2Min] = useState<number>(() => {
+    return getTabValue(initialActiveTab, 'limitA2Min', getTabDefaults(initialActiveTab).limitA2Min);
   });
-  const [limitA2Max, setLimitA2Max] = useState(() => {
-    const saved = localStorage.getItem('simulate_io_limitA2Max');
-    return saved !== null ? Number(saved) : 0;
+  const [limitA2Max, setLimitA2Max] = useState<number>(() => {
+    return getTabValue(initialActiveTab, 'limitA2Max', getTabDefaults(initialActiveTab).limitA2Max);
   });
 
   // Editor states
   const [gridSnapping, setGridSnapping] = useState(true);
   const [gridSize, setGridSize] = useState(5); // 5mm snapping default
   const [dimensions, setDimensions] = useState(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedDims = localStorage.getItem('simulate_io_dimensions');
-      if (savedDims) {
-        try {
-          const parsed = JSON.parse(savedDims);
-          // Migration from old single L_chank_leg descriptor to 3 independent properties:
-          if (parsed.L_chank_leg !== undefined) {
-            if (parsed.L_chank_left === undefined) parsed.L_chank_left = parsed.L_chank_leg;
-            if (parsed.L_chank_right === undefined) parsed.L_chank_right = parsed.L_chank_leg;
-            if (parsed.L_chank_top === undefined) parsed.L_chank_top = Number((parsed.L_chank_leg * Math.sqrt(2)).toFixed(1));
-          }
-          return { ...DEFAULT_DIMENSIONS, ...parsed };
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return DEFAULT_DIMENSIONS;
+    const defaults = getTabDefaults(initialActiveTab);
+    return getTabValue(initialActiveTab, 'dimensions', defaults.dimensions);
   });
 
   const [labelOffsets, setLabelOffsets] = useState<Record<string, { dx: number; dy: number }>>(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedOffsets = localStorage.getItem('simulate_io_label_offsets');
-      if (savedOffsets) {
-        try {
-          return JSON.parse(savedOffsets);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return {};
+    return getTabValue(initialActiveTab, 'labelOffsets', getTabDefaults(initialActiveTab).labelOffsets);
   });
 
   const dist_actuators = Math.sqrt(dimensions.dx_actuators ** 2 + dimensions.dy_actuators ** 2);
@@ -244,10 +497,11 @@ export default function App() {
   const [targetIK, setTargetIK] = useState<{ x: number; y: number } | null>(null);
   const [setTargetMode, setSetTargetMode] = useState(false);
   const [currentIK, setCurrentIK] = useState<{ x: number; y: number } | null>(null);
+  const [originalFootPos, setOriginalFootPos] = useState<{ x: number; y: number } | null>(null);
   const [ikSpeed, setIkSpeed] = useState<number>(() => {
     const saved = localStorage.getItem('simulate_io_ikSpeed');
-    return saved !== null ? Number(saved) : 80;
-  }); // Default speed of 80 mm/s
+    return saved !== null ? Number(saved) : 20;
+  }); // Default speed of 20 mm/s
 
   const targetIKRef = useRef<{ x: number; y: number } | null>(null);
   const currentIKRef = useRef<{ x: number; y: number } | null>(null);
@@ -334,102 +588,68 @@ export default function App() {
 
   // --- COMPONENT DATA STRUCTURES ---
   const [pivots, setPivots] = useState<Pivot[]>(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedPivots = localStorage.getItem('simulate_io_pivots');
-      if (savedPivots) {
-        try {
-          return JSON.parse(savedPivots);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return [];
+    const saved = getTabValue(initialActiveTab, 'pivots', null);
+    if (saved && saved.length > 0) return saved;
+    const defaults = getTabDefaults(initialActiveTab);
+    const { pivots: generatedPivots } = generateDefaultPivotsAndLinks(initialActiveTab, defaults.dimensions);
+    return generatedPivots;
   });
 
   const [links, setLinks] = useState<Link[]>(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedLinks = localStorage.getItem('simulate_io_links');
-      if (savedLinks) {
-        try {
-          return JSON.parse(savedLinks);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return [];
+    const saved = getTabValue(initialActiveTab, 'links', null);
+    if (saved && saved.length > 0) return saved;
+    const defaults = getTabDefaults(initialActiveTab);
+    const { links: generatedLinks } = generateDefaultPivotsAndLinks(initialActiveTab, defaults.dimensions);
+    return generatedLinks;
   });
 
   const [customDimensions, setCustomDimensions] = useState<CustomDimension[]>(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedDims = localStorage.getItem('simulate_io_custom_dimensions');
-      if (savedDims) {
-        try {
-          return JSON.parse(savedDims);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return [];
+    return getTabValue(initialActiveTab, 'customDimensions', getTabDefaults(initialActiveTab).customDimensions);
   });
 
   const [constructionLines, setConstructionLines] = useState<ConstructionLine[]>(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedLines = localStorage.getItem('simulate_io_construction_lines');
-      if (savedLines) {
-        try {
-          return JSON.parse(savedLines);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return DEFAULT_CONSTRUCTION_LINES;
+    return getTabValue(initialActiveTab, 'constructionLines', getTabDefaults(initialActiveTab).constructionLines);
   });
 
   const [angleDimensions, setAngleDimensions] = useState<AngleDimension[]>(() => {
-    const saved = localStorage.getItem('simulate_io_saved_positions');
-    if (saved === 'true') {
-      const savedAngs = localStorage.getItem('simulate_io_angle_dimensions');
-      if (savedAngs) {
-        try {
-          return JSON.parse(savedAngs);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return DEFAULT_ANGLE_DIMENSIONS;
+    return getTabValue(initialActiveTab, 'angleDimensions', getTabDefaults(initialActiveTab).angleDimensions);
   });
 
   const [autoSaving, setAutoSaving] = useState(false);
 
   // Silent, synchronous, immediate local storage save for every state change
   useEffect(() => {
+    if (isSwitchingTabRef.current) return;
+
+    // Skip saving empty state on very first mount so that preset loader can run first
+    const hasSaved = localStorage.getItem('simulate_io_saved_positions') === 'true';
+    if (!hasSaved && pivots.length === 0 && links.length === 0) {
+      return;
+    }
+
     localStorage.setItem('simulate_io_saved_positions', 'true');
-    localStorage.setItem('simulate_io_preset', preset);
-    localStorage.setItem('simulate_io_angleA1', String(angleA1));
-    localStorage.setItem('simulate_io_angleA2', String(angleA2));
-    localStorage.setItem('simulate_io_homeA1', String(homeA1));
-    localStorage.setItem('simulate_io_homeA2', String(homeA2));
-    localStorage.setItem('simulate_io_dimensions', JSON.stringify(dimensions));
-    localStorage.setItem('simulate_io_pivots', JSON.stringify(pivots));
-    localStorage.setItem('simulate_io_links', JSON.stringify(links));
-    localStorage.setItem('simulate_io_label_offsets', JSON.stringify(labelOffsets));
-    localStorage.setItem('simulate_io_custom_dimensions', JSON.stringify(customDimensions));
-    localStorage.setItem('simulate_io_construction_lines', JSON.stringify(constructionLines));
-    localStorage.setItem('simulate_io_angle_dimensions', JSON.stringify(angleDimensions));
-    localStorage.setItem('simulate_io_limitA1Min', String(limitA1Min));
-    localStorage.setItem('simulate_io_limitA1Max', String(limitA1Max));
-    localStorage.setItem('simulate_io_limitA2Min', String(limitA2Min));
-    localStorage.setItem('simulate_io_limitA2Max', String(limitA2Max));
-    localStorage.setItem('simulate_io_ikSpeed', String(ikSpeed));
+    localStorage.setItem('simulate_io_activeTab', activeTab);
+
+    // Save to the active tab namespace
+    localStorage.setItem(`simulate_io_${activeTab}_preset`, preset);
+    localStorage.setItem(`simulate_io_${activeTab}_angleA1`, String(angleA1));
+    localStorage.setItem(`simulate_io_${activeTab}_angleA2`, String(angleA2));
+    localStorage.setItem(`simulate_io_${activeTab}_homeA1`, String(homeA1));
+    localStorage.setItem(`simulate_io_${activeTab}_homeA2`, String(homeA2));
+    localStorage.setItem(`simulate_io_${activeTab}_dimensions`, JSON.stringify(dimensions));
+    localStorage.setItem(`simulate_io_${activeTab}_pivots`, JSON.stringify(pivots));
+    localStorage.setItem(`simulate_io_${activeTab}_links`, JSON.stringify(links));
+    localStorage.setItem(`simulate_io_${activeTab}_labelOffsets`, JSON.stringify(labelOffsets));
+    localStorage.setItem(`simulate_io_${activeTab}_customDimensions`, JSON.stringify(customDimensions));
+    localStorage.setItem(`simulate_io_${activeTab}_constructionLines`, JSON.stringify(constructionLines));
+    localStorage.setItem(`simulate_io_${activeTab}_angleDimensions`, JSON.stringify(angleDimensions));
+    localStorage.setItem(`simulate_io_${activeTab}_limitA1Min`, String(limitA1Min));
+    localStorage.setItem(`simulate_io_${activeTab}_limitA1Max`, String(limitA1Max));
+    localStorage.setItem(`simulate_io_${activeTab}_limitA2Min`, String(limitA2Min));
+    localStorage.setItem(`simulate_io_${activeTab}_limitA2Max`, String(limitA2Max));
+    localStorage.setItem(`simulate_io_${activeTab}_gaitWaypoints`, JSON.stringify(gaitWaypoints));
+    localStorage.setItem(`simulate_io_${activeTab}_trajectory`, JSON.stringify(trajectory));
+    localStorage.setItem(`simulate_io_${activeTab}_ikSpeed`, String(ikSpeed));
 
     // Show a high-fidelity debounced saving feedback badge in the corner
     setAutoSaving(true);
@@ -439,6 +659,7 @@ export default function App() {
 
     return () => clearTimeout(timeout);
   }, [
+    activeTab,
     preset, 
     angleA1, 
     angleA2, 
@@ -455,6 +676,8 @@ export default function App() {
     limitA1Max, 
     limitA2Min, 
     limitA2Max, 
+    gaitWaypoints,
+    trajectory,
     ikSpeed
   ]);
 
@@ -471,6 +694,7 @@ export default function App() {
   const isFirstRender = useRef(true);
   const prevPresetRef = useRef<MechanismPresetType | null>(null);
   useEffect(() => {
+    if (isSwitchingTabRef.current) return;
     const hasSaved = localStorage.getItem('simulate_io_saved_positions') === 'true';
     if (hasSaved && isFirstRender.current) {
       isFirstRender.current = false;
@@ -509,8 +733,8 @@ export default function App() {
 
       // Setup the hand-designed parallelogram leg nodes matching the schematic precisely
       const initialPivots: Pivot[] = [
-        { id: 'A1', name: 'Servo Actuator A1 (ID 41)', type: 'actuator', x: a1_x, y: a1_y, z: 0, actuatorId: 'A1' },
-        { id: 'A2', name: 'Servo Actuator A2 (ID 42)', type: 'actuator', x: a2_x, y: a2_y, z: 0, actuatorId: 'A2' },
+        { id: 'A1', name: 'Servo MG996R A1 (ID 41)', type: 'actuator', x: a1_x, y: a1_y, z: 0, actuatorId: 'A1' },
+        { id: 'A2', name: 'Servo MG996R A2 (ID 42)', type: 'actuator', x: a2_x, y: a2_y, z: 0, actuatorId: 'A2' },
         { 
           id: 'P1', 
           name: 'Tibia Servo Pin P1', 
@@ -529,7 +753,7 @@ export default function App() {
         },
         { 
           id: 'P_chank_TL', 
-          name: 'Chank Top-Left Joint', 
+          name: 'Ternary Linkage Top-Left Joint', 
           type: 'free', 
           x: startResult ? startResult.P_chank_TL.x : a2_x - 16.5, 
           y: startResult ? startResult.P_chank_TL.y : a2_y + 16.5, 
@@ -537,7 +761,7 @@ export default function App() {
         },
         { 
           id: 'P_chank_TR', 
-          name: 'Chank Top-Right Joint', 
+          name: 'Ternary Linkage Top-Right Joint', 
           type: 'free', 
           x: startResult ? startResult.P_chank_TR.x : a2_x + 16.5, 
           y: startResult ? startResult.P_chank_TR.y : a2_y + 16.5, 
@@ -565,17 +789,17 @@ export default function App() {
         { id: 'l_tibia_servo', name: 'Tibia Servo Link', pivotIds: ['A1', 'P1'], color: '#ef4444', thickness: 4 },
         { id: 'l_second_tibia', name: 'Second Tibia Link', pivotIds: ['P1', 'P_chank_TL'], color: '#38bdf8', thickness: 3 },
         { id: 'l_femur', name: 'Femur Servo Link', pivotIds: ['A2', 'P2'], color: '#737373', thickness: 5 },
-        { id: 'l_chank', name: 'Chank Tibia Link', pivotIds: ['A2', 'P_chank_TL', 'P_chank_TR'], color: '#f59e0b', thickness: 3, isTriangle: true },
+        { id: 'l_chank', name: 'Ternary Linkage', pivotIds: ['A2', 'P_chank_TL', 'P_chank_TR'], color: '#f59e0b', thickness: 3, isTriangle: true },
         { id: 'l_rear_tibia', name: 'Rear Tibia Link', pivotIds: ['P_chank_TR', 'P_tibia_rear'], color: '#8b5cf6', thickness: 3 },
         { id: 'l_tibia', name: 'Tibia Link', pivotIds: ['P_tibia_rear', 'P2', 'P_foot'], color: '#10b981', thickness: 4 },
       ];
 
       setPivots(initialPivots);
       setLinks(initialLinks);
-      setAngleA1(131.5);
-      setAngleA2(-48.0);
-      setHomeA1(131.5);
-      setHomeA2(-48.0);
+      setAngleA1(135.0);
+      setAngleA2(-45.0);
+      setHomeA1(135.0);
+      setHomeA2(-45.0);
       setTrajectory([]);
       setGaitRunning(false);
     } else if (preset === 'five_bar') {
@@ -835,10 +1059,12 @@ export default function App() {
         const startPos = { x: foot.x, y: foot.y };
         currentIKRef.current = startPos;
         setCurrentIK(startPos);
+        setOriginalFootPos(startPos);
       }
     } else {
       currentIKRef.current = null;
       setCurrentIK(null);
+      setOriginalFootPos(null);
     }
   }, [ikActive, activePositions]);
 
@@ -939,40 +1165,13 @@ export default function App() {
 
   // Handle click-drag Inverse Kinematics solving
   const handleTargetDrag = (x: number, y: number) => {
+    if (!ikActive && activePositions && activePositions['P_foot']) {
+      const foot = activePositions['P_foot'];
+      setOriginalFootPos({ x: foot.x, y: foot.y });
+    }
     setTargetIK({ x, y });
     setIkActive(true);
     setGaitRunning(false);
-
-    // Instant solve during active drag interaction so the visual leg follows the finger/mouse instantly
-    if (preset === 'parallelogram_leg') {
-      const ikSolve = solveDefaultLegIK(x, y, {
-        a1x: dimensions.a1x !== undefined ? dimensions.a1x : 0.0,
-        a1y: dimensions.a1y !== undefined ? dimensions.a1y : 0.0,
-        a2x: dimensions.a2x !== undefined ? dimensions.a2x : dimensions.dx_actuators,
-        a2y: dimensions.a2y !== undefined ? dimensions.a2y : dimensions.dy_actuators,
-        L_tibia_servo: dimensions.L_tibia_servo,
-        L_second_tibia: dimensions.L_second_tibia,
-        L_femur_servo: dimensions.L_femur_servo,
-        L_chank_left: dimensions.L_chank_left,
-        L_chank_right: dimensions.L_chank_right,
-        L_chank_top: dimensions.L_chank_top,
-        L_rear_tibia: dimensions.L_rear_tibia,
-        L_tibia_total: dimensions.L_tibia_total,
-        L_tibia_offset: dimensions.L_tibia_offset,
-      });
-
-      if (ikSolve) {
-        setAngleA1(Math.max(limitA1Min, Math.min(limitA1Max, ikSolve.angleA1)));
-        setAngleA2(Math.max(limitA2Min, Math.min(limitA2Max, ikSolve.angleA2)));
-      }
-    } else {
-      setPivots((prev) =>
-        prev.map((p) => (p.id === 'P_foot' ? { ...p, type: 'fixed', x, y } : p))
-      );
-    }
-
-    currentIKRef.current = { x, y };
-    setCurrentIK({ x, y });
   };
 
   const handleWaypointSelect = (id: string | null) => {
@@ -1206,9 +1405,14 @@ export default function App() {
     localStorage.setItem('simulate_io_limitA2Max', String(limitA2Max));
   };
 
-  const handleGoToHome = () => {
-    setGaitRunning(false);
+  const handleGoToHome = (keepGaitRunning = false) => {
+    if (!keepGaitRunning) {
+      setGaitRunning(false);
+    }
     setIkActive(false);
+    setTargetIK(null);
+    setOriginalFootPos(null);
+    setSetTargetMode(false);
 
     // Explicitly restore standard actuator coordinate origins to recover from unstable states immediately
     setDimensions((prev: any) => ({
@@ -1240,6 +1444,21 @@ export default function App() {
     };
 
     requestAnimationFrame(animateHome);
+  };
+
+  const handleToggleSimEditor = () => {
+    handleGoToHome(false);
+    setSimEditorOpen((prev) => !prev);
+  };
+
+  const handleToggleGaitSim = () => {
+    const nextGait = !gaitRunning;
+    if (nextGait) {
+      handleGoToHome(true);
+      setGaitRunning(true);
+    } else {
+      setGaitRunning(false);
+    }
   };
 
   // Add Components Handlers for Custom Builder
@@ -1307,7 +1526,7 @@ export default function App() {
           </div>
           <div className="flex flex-col justify-center">
             <span className="font-bold tracking-tight text-base text-sleek-text flex items-center gap-2 leading-none">
-              ROBOLEG.IO <span className="text-sleek-text/40 font-normal text-xs">v1.0.0</span>
+              ROBOTDOGSIM.RUBENCHEVEZ.COM <span className="text-sleek-text/40 font-normal text-xs">v1.0.0</span>
             </span>
             <span className="text-[10px] text-sleek-text-muted mt-1 leading-none tracking-wide">
               designed by Ruben Chevez
@@ -1411,6 +1630,7 @@ export default function App() {
                 targetIK={targetIK}
                 onTargetDrag={handleTargetDrag}
                 ikActive={ikActive}
+                originalFootPos={originalFootPos}
                 gridSnapping={gridSnapping}
                 gridSize={gridSize}
                 angleA1={angleA1}
@@ -1450,6 +1670,8 @@ export default function App() {
                 selectedWaypointId={selectedWaypointId}
                 onWaypointSelect={handleWaypointSelect}
                 onWaypointDrag={handleWaypointDrag}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
               />
               <div className="absolute bottom-4 left-4 z-50 flex flex-col gap-2 pointer-events-none max-w-sm">
                 <AnimatePresence>
@@ -1667,6 +1889,7 @@ export default function App() {
 
         {/* Right Side: Actuator Sliders & Load Torques Telemetry */}
         <SidebarRight
+          activeTab={activeTab}
           angleA1={angleA1}
           angleA2={angleA2}
           onAngleA1Change={handleAngleA1Change}
@@ -1674,7 +1897,7 @@ export default function App() {
           pivots={pivots}
           solvedPositions={activePositions}
           simEditorOpen={simEditorOpen}
-          onToggleSimEditor={() => setSimEditorOpen((prev) => !prev)}
+          onToggleSimEditor={handleToggleSimEditor}
           onClearTrail={() => setTrajectory([])}
           trajectory={trajectory}
           onSetHome={handleSetHome}
@@ -1682,7 +1905,7 @@ export default function App() {
           homeA1={homeA1}
           homeA2={homeA2}
           gaitRunning={gaitRunning}
-          onToggleGaitSim={() => setGaitRunning(!gaitRunning)}
+          onToggleGaitSim={handleToggleGaitSim}
           setTargetMode={setTargetMode}
           onToggleSetTargetMode={() => setSetTargetMode((prev) => !prev)}
           isTargetUnreachable={isTargetUnreachable}
@@ -1690,6 +1913,7 @@ export default function App() {
           onResetTarget={handleResetTarget}
           ikSpeed={ikSpeed}
           onChangeIkSpeed={setIkSpeed}
+          originalFootPos={originalFootPos}
           limitA1Min={limitA1Min}
           limitA1Max={limitA1Max}
           limitA2Min={limitA2Min}
@@ -1757,9 +1981,9 @@ export default function App() {
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1 text-sleek-blue">2. The "Chank Link" Rigid-Body</h4>
+                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1 text-sleek-blue">2. Ternary Linkage &amp; Watt Six-Bar</h4>
                   <p className="text-white/80">
-                    The **Chank** is styled as a non-linear triangular link with sides (Left: {dimensions.L_chank_left} mm, Right: {dimensions.L_chank_right} mm, Top: {dimensions.L_chank_top} mm). It rotates freely about pivot A2, serving as a torque-transfer anchor. It is driven by the Tibia Servo Link via the intermediate Second Tibia Link, completely isolating the femur and foot coordinate trajectories.
+                    The **Ternary Linkage** is styled as a non-linear triangular link with sides (Left: {dimensions.L_chank_left} mm, Right: {dimensions.L_chank_right} mm, Top: {dimensions.L_chank_top} mm). It is part of the **Watt II six-bar linkage** assembly and rotates freely about pivot A2, serving as a torque-transfer anchor. It is driven by the Tibia Servo Link via the intermediate Second Tibia Link, completely isolating the femur and foot coordinate trajectories.
                   </p>
                 </div>
 

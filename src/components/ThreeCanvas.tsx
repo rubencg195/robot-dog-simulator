@@ -29,6 +29,7 @@ interface ThreeCanvasProps {
   targetIK: { x: number; y: number } | null;
   onTargetDrag: (x: number, y: number) => void;
   ikActive: boolean;
+  originalFootPos: { x: number; y: number } | null;
   gridSnapping: boolean;
   gridSize: number;
   angleA1: number;
@@ -69,6 +70,8 @@ interface ThreeCanvasProps {
   selectedWaypointId?: string | null;
   onWaypointSelect?: (id: string | null) => void;
   onWaypointDrag?: (id: string, x: number, y: number) => void;
+  activeTab?: 'MG996R' | 'ST3215';
+  onTabChange?: (tab: 'MG996R' | 'ST3215') => void;
 }
 
 export default function ThreeCanvas({
@@ -80,6 +83,7 @@ export default function ThreeCanvas({
   targetIK,
   onTargetDrag,
   ikActive,
+  originalFootPos,
   gridSnapping,
   gridSize,
   angleA1,
@@ -119,6 +123,8 @@ export default function ThreeCanvas({
   selectedWaypointId = null,
   onWaypointSelect,
   onWaypointDrag,
+  activeTab = 'MG996R',
+  onTabChange,
 }: ThreeCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -135,6 +141,13 @@ export default function ThreeCanvas({
   const labelOffsetsRef = useRef(labelOffsets);
   const customDimensionsRef = useRef(customDimensions);
   const updateFloatingLabelsRef = useRef<() => void>(() => {});
+
+  // Synchronously update refs on every render to prevent single-frame lag / stale closure bugs when changing tabs or parameters
+  solvedPositionsRef.current = solvedPositions;
+  angleA1Ref.current = angleA1;
+  angleA2Ref.current = angleA2;
+  labelOffsetsRef.current = labelOffsets;
+  customDimensionsRef.current = customDimensions;
 
   // Caching container size to prevent layout thrashing and lag during panning/zooming
   const containerSizeRef = useRef({ w: 800, h: 600 });
@@ -162,13 +175,7 @@ export default function ThreeCanvas({
     showToeTipLabelRef.current = showToeTipLabel;
   }, [showActuatorLabels, showSpacingLabels, showLengthLabels, showCustomDimLabels, showToeTipLabel]);
 
-  useEffect(() => {
-    solvedPositionsRef.current = solvedPositions;
-    angleA1Ref.current = angleA1;
-    angleA2Ref.current = angleA2;
-    labelOffsetsRef.current = labelOffsets;
-    customDimensionsRef.current = customDimensions;
-  }, [solvedPositions, angleA1, angleA2, labelOffsets, customDimensions]);
+
 
   // Inline editing parameter state
   const [editingParam, setEditingParam] = useState<{
@@ -214,6 +221,7 @@ export default function ThreeCanvas({
   useEffect(() => {
     if (controlsRef.current) {
       controlsRef.current.enableRotate = !isViewLocked;
+      controlsRef.current.enablePan = !isViewLocked;
     }
   }, [isViewLocked]);
 
@@ -1419,6 +1427,37 @@ export default function ThreeCanvas({
       }
     });
 
+    // Dynamic Translation Triangle Floating Legends
+    if (ikActive && originalFootPos && currentSolved && currentSolved['P_foot'] && dimMode === 'idle') {
+      const p_orig = originalFootPos;
+      const p_curr = currentSolved['P_foot'];
+
+      const dx = Math.abs(p_curr.x - p_orig.x);
+      const dy = Math.abs(p_curr.y - p_orig.y);
+      const dc = Math.hypot(p_curr.x - p_orig.x, p_curr.y - p_orig.y);
+
+      const elDx = getCachedElement('lbl-triangle-dx');
+      if (elDx) elDx.textContent = `ΔX: ${dx.toFixed(1)} mm`;
+
+      const elDy = getCachedElement('lbl-triangle-dy');
+      if (elDy) elDy.textContent = `ΔY: ${dy.toFixed(1)} mm`;
+
+      const elDc = getCachedElement('lbl-triangle-dc');
+      if (elDc) elDc.textContent = `ΔC: ${dc.toFixed(1)} mm`;
+
+      // Position them on their respective midpoints with subtle text separation offsets
+      updateEl('lbl-triangle-dx', (p_orig.x + p_curr.x) / 2, p_orig.y, 0.1, -12, 0);
+      updateEl('lbl-triangle-dy', p_curr.x, (p_orig.y + p_curr.y) / 2, 0.1, 0, 0);
+      updateEl('lbl-triangle-dc', (p_orig.x + p_curr.x) / 2, (p_orig.y + p_curr.y) / 2, 0.15, 12, 0);
+    } else {
+      const elDx = getCachedElement('lbl-triangle-dx');
+      const elDy = getCachedElement('lbl-triangle-dy');
+      const elDc = getCachedElement('lbl-triangle-dc');
+      if (elDx) elDx.style.display = 'none';
+      if (elDy) elDy.style.display = 'none';
+      if (elDc) elDc.style.display = 'none';
+    }
+
     } catch (err) {
       console.error('Error in updateFloatingLabels:', err);
     }
@@ -1475,14 +1514,8 @@ export default function ThreeCanvas({
 
     if (theme === 'light') {
       scene.background = new THREE.Color(0xf1f5f9);
-      if (scene.fog) {
-        scene.fog.color = new THREE.Color(0xf1f5f9);
-      }
     } else {
       scene.background = new THREE.Color(0x0e131f);
-      if (scene.fog) {
-        scene.fog.color = new THREE.Color(0x0e131f);
-      }
     }
   }, [theme]);
 
@@ -1490,6 +1523,10 @@ export default function ThreeCanvas({
   const linkageGroupRef = useRef<THREE.Group | null>(null);
   const trailMeshRef = useRef<THREE.Line | null>(null);
   const targetSphereRef = useRef<THREE.Mesh | null>(null);
+  const originalSphereRef = useRef<THREE.Mesh | null>(null);
+  const translationXLineRef = useRef<THREE.Line | null>(null);
+  const translationYLineRef = useRef<THREE.Line | null>(null);
+  const translationCLineRef = useRef<THREE.Line | null>(null);
 
   // Gait waypoints refs
   const gaitWaypointsGroupRef = useRef<THREE.Group | null>(null);
@@ -1516,7 +1553,7 @@ export default function ThreeCanvas({
     const currentTarget = controlsRef.current.target.clone();
     
     // Maintain standard camera orbit distance
-    const distance = currentPos.distanceTo(currentTarget) || 160;
+    const distance = currentPos.distanceTo(currentTarget) || 720;
     const targetPos = new THREE.Vector3();
     
     switch (viewName) {
@@ -1540,7 +1577,7 @@ export default function ThreeCanvas({
         break;
       case 'home':
       default:
-        targetPos.set(40, -40, 160);
+        targetPos.set(40, -40, 720);
         break;
     }
     
@@ -1622,15 +1659,14 @@ export default function ThreeCanvas({
     scene.background = new THREE.Color(initialBgColor);
     sceneRef.current = scene;
 
-    // Fog for depth
-    scene.fog = new THREE.FogExp2(initialBgColor, 0.0015);
+    // No fog for maximum schematic clarity and crisp high contrast
 
-    // 2. Camera Setup
+        // 2. Camera Setup
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
     containerSizeRef.current = { w: width, h: height };
-    const camera = new THREE.PerspectiveCamera(45, width / height, 1, 1000);
-    camera.position.set(40, -40, 160); // View linkage centered
+    const camera = new THREE.PerspectiveCamera(10, width / height, 1, 3000);
+    camera.position.set(30, 15, 720); // Centered front-view position aligned with target (30, 15, 0)
     cameraRef.current = camera;
 
     // 3. Renderer Setup
@@ -1649,8 +1685,8 @@ export default function ThreeCanvas({
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.maxPolarAngle = Math.PI / 2 + 0.1; // Restrict camera below the grid
-    controls.minDistance = 20;
-    controls.maxDistance = 400;
+    controls.minDistance = 100;
+    controls.maxDistance = 2000;
     controls.target.set(30, 15, 0); // Center around typical mechanism workspace
     controls.enableRotate = false; // Enabled by default on front view, so starts as locked (false)
     controlsRef.current = controls;
@@ -1757,6 +1793,51 @@ export default function ThreeCanvas({
     const targetRing = new THREE.Mesh(targetRingGeom, targetRingMat);
     targetSphere.add(targetRing);
 
+    // Red Original position indicator
+    const origGeom = new THREE.SphereGeometry(3.5, 32, 32);
+    const origMat = new THREE.MeshStandardMaterial({
+      color: 0xef4444, // Red
+      roughness: 0.1,
+      metalness: 0.9,
+      emissive: 0xdc2626,
+      emissiveIntensity: 0.6,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const originalSphere = new THREE.Mesh(origGeom, origMat);
+    originalSphere.visible = false;
+    scene.add(originalSphere);
+    originalSphereRef.current = originalSphere;
+
+    const origRingGeom = new THREE.RingGeometry(4.2, 5.2, 32);
+    const origRingMat = new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide });
+    const origRing = new THREE.Mesh(origRingGeom, origRingMat);
+    originalSphere.add(origRing);
+
+    // X Translation Line
+    const lineXGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0)]);
+    const lineXMat = new THREE.LineBasicMaterial({ color: 0xf97316, linewidth: 2 }); // Orange
+    const lineX = new THREE.Line(lineXGeom, lineXMat);
+    lineX.visible = false;
+    scene.add(lineX);
+    translationXLineRef.current = lineX;
+
+    // Y Translation Line
+    const lineYGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0)]);
+    const lineYMat = new THREE.LineBasicMaterial({ color: 0x06b6d4, linewidth: 2 }); // Cyan
+    const lineY = new THREE.Line(lineYGeom, lineYMat);
+    lineY.visible = false;
+    scene.add(lineY);
+    translationYLineRef.current = lineY;
+
+    // C Translation Line
+    const lineCGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0)]);
+    const lineCMat = new THREE.LineBasicMaterial({ color: 0xec4899, linewidth: 3 }); // Pink/Magenta
+    const lineC = new THREE.Line(lineCGeom, lineCMat);
+    lineC.visible = false;
+    scene.add(lineC);
+    translationCLineRef.current = lineC;
+
     // Container Resize observer to detect sidebar toggling & layout changes instantly
     const resizeObserver = new ResizeObserver(() => {
       if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
@@ -1828,6 +1909,9 @@ export default function ThreeCanvas({
       if (targetRing) {
         targetRing.rotation.z += 0.02;
       }
+      if (origRing) {
+        origRing.rotation.z -= 0.02;
+      }
 
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
         rendererRef.current.render(sceneRef.current, cameraRef.current);
@@ -1858,6 +1942,57 @@ export default function ThreeCanvas({
       targetSphereRef.current.visible = false;
     }
   }, [ikActive, targetIK, dimMode]);
+
+  // Update original start position indicators and dynamic translation triangle
+  useEffect(() => {
+    const originalSphere = originalSphereRef.current;
+    const lineX = translationXLineRef.current;
+    const lineY = translationYLineRef.current;
+    const lineC = translationCLineRef.current;
+
+    if (!originalSphere || !lineX || !lineY || !lineC) return;
+
+    if (ikActive && originalFootPos && solvedPositions && solvedPositions['P_foot'] && dimMode === 'idle') {
+      const p_orig = originalFootPos;
+      const p_curr = solvedPositions['P_foot'];
+
+      // 1. Red start sphere
+      originalSphere.position.set(p_orig.x, p_orig.y, 0);
+      originalSphere.visible = true;
+
+      // 2. Horizontal (Orange) translation line
+      // From originalFootPos (p_orig) to (p_curr.x, p_orig.y)
+      const pointsX = [
+        new THREE.Vector3(p_orig.x, p_orig.y, 0.1),
+        new THREE.Vector3(p_curr.x, p_orig.y, 0.1),
+      ];
+      lineX.geometry.setFromPoints(pointsX);
+      lineX.visible = true;
+
+      // 3. Vertical (Cyan) translation line
+      // From (p_curr.x, p_orig.y) to (p_curr.x, p_curr.y)
+      const pointsY = [
+        new THREE.Vector3(p_curr.x, p_orig.y, 0.1),
+        new THREE.Vector3(p_curr.x, p_curr.y, 0.1),
+      ];
+      lineY.geometry.setFromPoints(pointsY);
+      lineY.visible = true;
+
+      // 4. Hypotenuse (Pink) translation line
+      // From originalFootPos (p_orig) to (p_curr.x, p_curr.y)
+      const pointsC = [
+        new THREE.Vector3(p_orig.x, p_orig.y, 0.15),
+        new THREE.Vector3(p_curr.x, p_curr.y, 0.15),
+      ];
+      lineC.geometry.setFromPoints(pointsC);
+      lineC.visible = true;
+    } else {
+      originalSphere.visible = false;
+      lineX.visible = false;
+      lineY.visible = false;
+      lineC.visible = false;
+    }
+  }, [ikActive, originalFootPos, solvedPositions, dimMode]);
 
   // If IK active becomes true, cancel dimension and CAD tools to prevent state collision
   useEffect(() => {
@@ -2709,6 +2844,8 @@ export default function ThreeCanvas({
         className={`block w-full h-full outline-none ${
           setTargetMode 
             ? 'cursor-crosshair bg-red-500/5' 
+            : isViewLocked
+            ? 'cursor-default'
             : 'cursor-grab active:cursor-grabbing'
         }`}
         id="three-canvas-root"
@@ -2782,20 +2919,21 @@ export default function ThreeCanvas({
           const isDeleteHovered = hoveredDeleteTarget && hoveredDeleteTarget.type === 'construction' && hoveredDeleteTarget.id === cl.id;
           const isHovered = (hoveredSegment && hoveredSegment.type === 'construction' && hoveredSegment.id === cl.id) || isDeleteHovered;
 
-          // Determine constraint. Either saved in cl.constraint, or computed on the fly!
-          let constraint: 'horizontal' | 'vertical' | undefined = cl.constraint;
-          if (!constraint) {
-            // Check if coordinates in 3D are perfectly aligned
-            const pos1 = getJoint3DPos(cl.p1);
-            const pos2 = getJoint3DPos(cl.p2);
-            if (pos1 && pos2) {
-              if (Math.abs(pos1.x - pos2.x) < 0.001) {
-                constraint = 'vertical';
-              } else if (Math.abs(pos1.y - pos2.y) < 0.001) {
-                constraint = 'horizontal';
-              }
+          // Determine constraint dynamically on the fly based on current joint positions.
+          // Only show key indicators if they are actually aligned horizontally or vertically currently.
+          let constraint: 'horizontal' | 'vertical' | undefined = undefined;
+          const pos1 = getJoint3DPos(cl.p1);
+          const pos2 = getJoint3DPos(cl.p2);
+          if (pos1 && pos2) {
+            if (Math.abs(pos1.x - pos2.x) < 0.15) {
+              constraint = 'vertical';
+            } else if (Math.abs(pos1.y - pos2.y) < 0.15) {
+              constraint = 'horizontal';
             }
           }
+
+          const drawX2 = m2.px;
+          const drawY2 = m2.py;
 
           const midX = (m1.px + m2.px) / 2;
           const midY = (m1.py + m2.py) / 2;
@@ -2820,8 +2958,8 @@ export default function ThreeCanvas({
               <line 
                 x1={m1.px} 
                 y1={m1.py} 
-                x2={m2.px} 
-                y2={m2.py} 
+                x2={drawX2} 
+                y2={drawY2} 
                 className="stroke-transparent stroke-[12] cursor-pointer pointer-events-auto"
                 onMouseEnter={() => {
                   if (cadTool === 'delete') {
@@ -2856,8 +2994,8 @@ export default function ThreeCanvas({
               <line 
                 x1={m1.px} 
                 y1={m1.py} 
-                x2={m2.px} 
-                y2={m2.py} 
+                x2={drawX2} 
+                y2={drawY2} 
                 className={`stroke-[6] transition-all ${
                   isDeleteHovered
                     ? 'stroke-red-500 stroke-[8] drop-shadow-[0_0_4px_rgba(239,68,68,0.8)] animate-pulse'
@@ -2868,7 +3006,7 @@ export default function ThreeCanvas({
                 strokeDasharray="4,4"
               />
               <circle cx={m1.px} cy={m1.py} r={4.5} className={isDeleteHovered ? "fill-red-500" : "fill-amber-500"} />
-              <circle cx={m2.px} cy={m2.py} r={4.5} className={isDeleteHovered ? "fill-red-500" : "fill-amber-500"} />
+              <circle cx={drawX2} cy={drawY2} r={4.5} className={isDeleteHovered ? "fill-red-500" : "fill-amber-500"} />
 
               {/* Constraint icon */}
               {constraint && (
@@ -3056,7 +3194,7 @@ export default function ThreeCanvas({
 
         {/* Angle dimensions curves */}
         {angleDimensions.map((ad) => {
-          const currentSolved = solvedPositionsRef.current || solvedPositions;
+          const currentSolved = solvedPositions;
           const geom = resolveAngleGeometry(ad, currentSolved);
           if (!geom) return null;
 
@@ -3081,8 +3219,9 @@ export default function ThreeCanvas({
           const endY = mVertex.py + R * Math.sin(alpha2);
 
           const alphaMid = alpha1 + diff / 2;
-          const lx = mVertex.px + (R + 16) * Math.cos(alphaMid);
-          const ly = mVertex.py + (R + 16) * Math.sin(alphaMid);
+          const offset = labelOffsets[ad.id] || { dx: 0, dy: 0 };
+          const lx = mVertex.px + (R + 16) * Math.cos(alphaMid) + offset.dx;
+          const ly = mVertex.py + (R + 16) * Math.sin(alphaMid) + offset.dy;
 
           const isDeleteHovered = hoveredDeleteTarget && hoveredDeleteTarget.type === 'angle' && hoveredDeleteTarget.id === ad.id;
 
@@ -3130,7 +3269,7 @@ export default function ThreeCanvas({
               />
               <g 
                 transform={`translate(${lx}, ${ly})`}
-                className={cadTool === 'delete' ? 'cursor-pointer pointer-events-auto' : ''}
+                className={cadTool === 'delete' ? 'cursor-pointer pointer-events-auto' : 'cursor-grab active:cursor-grabbing pointer-events-auto'}
                 onMouseEnter={() => {
                   if (cadTool === 'delete') {
                     updateHoveredDeleteTarget({ type: 'angle', id: ad.id });
@@ -3140,6 +3279,10 @@ export default function ThreeCanvas({
                   if (cadTool === 'delete') {
                     updateHoveredDeleteTarget(null);
                   }
+                }}
+                onMouseDown={(e) => {
+                  if (cadTool === 'delete') return;
+                  startDragHud(ad.id, e);
                 }}
                 onClick={(e) => {
                   if (cadTool === 'delete') {
@@ -3203,7 +3346,7 @@ export default function ThreeCanvas({
             vertexId: '',
             radius: 10
           };
-          const currentSolved = solvedPositionsRef.current || solvedPositions;
+          const currentSolved = solvedPositions;
           // Get basic vertex geometry first to find vertex px/py and rays
           const baseGeom = resolveAngleGeometry(dummyBase, currentSolved);
           if (!baseGeom) return null;
@@ -3330,10 +3473,10 @@ export default function ThreeCanvas({
           const offset_start = 3 * sign_h;
           const offset_end = 6 * sign_h;
 
-          const arrow_A = `M ${A_p.x} ${A_p.y} L ${A_p.x + 8 * ux + 2.5 * nx} ${A_p.y + 8 * uy + 2.5 * ny} L ${A_p.x + 8 * ux - 2.5 * nx} ${A_p.y + 8 * uy - 2.5 * ny} Z`;
+           const arrow_A = `M ${A_p.x} ${A_p.y} L ${A_p.x + 8 * ux + 2.5 * nx} ${A_p.y + 8 * uy + 2.5 * ny} L ${A_p.x + 8 * ux - 2.5 * nx} ${A_p.y + 8 * uy - 2.5 * ny} Z`;
           const arrow_B = `M ${B_p.x} ${B_p.y} L ${B_p.x - 8 * ux + 2.5 * nx} ${B_p.y - 8 * uy + 2.5 * ny} L ${B_p.x - 8 * ux - 2.5 * nx} ${B_p.y - 8 * uy - 2.5 * ny} Z`;
 
-          const currentSolved = solvedPositionsRef.current || solvedPositions;
+          const currentSolved = solvedPositions;
           const pt1Val = currentSolved ? currentSolved[pt1] : null;
           const pt2Val = currentSolved ? currentSolved[pt2] : null;
           const actualMmVal = pt1Val && pt2Val ? Math.hypot(pt2Val.x - pt1Val.x, pt2Val.y - pt1Val.y) : 0;
@@ -3519,6 +3662,29 @@ export default function ThreeCanvas({
           {/* Pulsing ring */}
           <div className="absolute w-8 h-8 rounded-full border border-red-500 animate-ping opacity-40 animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite]" />
         </div>
+
+        {/* Dynamic Translation Triangle Floating Legends */}
+        <div
+          id="lbl-triangle-dx"
+          className="absolute px-1.5 py-0.5 rounded border text-[9px] font-mono font-bold transform -translate-x-1/2 -translate-y-1/2 shadow-md bg-white/95 dark:bg-slate-900/90 border-orange-500 text-orange-600 dark:text-orange-400 pointer-events-none"
+          style={{ display: 'none' }}
+        >
+          ΔX: 0.0 mm
+        </div>
+        <div
+          id="lbl-triangle-dy"
+          className="absolute px-1.5 py-0.5 rounded border text-[9px] font-mono font-bold transform -translate-x-1/2 -translate-y-1/2 shadow-md bg-white/95 dark:bg-slate-900/90 border-cyan-500 text-cyan-600 dark:text-cyan-400 pointer-events-none"
+          style={{ display: 'none' }}
+        >
+          ΔY: 0.0 mm
+        </div>
+        <div
+          id="lbl-triangle-dc"
+          className="absolute px-1.5 py-0.5 rounded border text-[9px] font-mono font-bold transform -translate-x-1/2 -translate-y-1/2 shadow-md bg-white/95 dark:bg-slate-900/90 border-pink-500 text-pink-600 dark:text-pink-400 pointer-events-none animate-pulse"
+          style={{ display: 'none' }}
+        >
+          ΔC: 0.0 mm
+        </div>
       </div>
 
       {dimMode !== 'idle' && (
@@ -3538,7 +3704,7 @@ export default function ThreeCanvas({
       )}
 
       {dimMode === 'idle' && (cadTool === 'angle_seg1' || cadTool === 'angle_seg2' || cadTool === 'angle_drag') && (
-        <div className="absolute top-14 left-4 z-40 bg-blue-950/90 border border-blue-500/40 px-3 py-2 rounded-lg backdrop-blur text-blue-200 text-xs font-mono shadow-xl flex flex-col gap-1 pointer-events-auto">
+        <div className="absolute top-[128px] left-4 z-40 bg-blue-950/90 border border-blue-500/40 px-3 py-2 rounded-lg backdrop-blur text-blue-200 text-xs font-mono shadow-xl flex flex-col gap-1 pointer-events-auto">
           <div className="flex items-center gap-2 font-bold text-white uppercase text-[10px] tracking-wider text-blue-400">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             Smart Dimension Tool: Angle active
@@ -3553,7 +3719,7 @@ export default function ThreeCanvas({
       )}
 
       {dimMode === 'idle' && (cadTool === 'construction_p1' || cadTool === 'construction_p2') && (
-        <div className="absolute top-14 left-4 z-40 bg-amber-950/95 border border-amber-500/40 px-3 py-2 rounded-lg backdrop-blur text-amber-200 text-xs font-mono shadow-xl flex flex-col gap-1 pointer-events-auto">
+        <div className="absolute top-[128px] left-4 z-40 bg-amber-950/95 border border-amber-500/40 px-3 py-2 rounded-lg backdrop-blur text-amber-200 text-xs font-mono shadow-xl flex flex-col gap-1 pointer-events-auto">
           <div className="flex items-center gap-2 font-bold text-white uppercase text-[10px] tracking-wider text-amber-400">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
             Construction Line Tool active
@@ -3567,7 +3733,7 @@ export default function ThreeCanvas({
       )}
 
       {cadTool === 'delete' && (
-        <div className="absolute top-14 left-4 z-40 bg-red-950/95 border border-red-500/40 px-3.5 py-2.5 rounded-lg backdrop-blur text-red-200 text-xs font-mono shadow-xl flex flex-col gap-1 pointer-events-auto max-w-sm">
+        <div className="absolute top-[128px] left-4 z-40 bg-red-950/95 border border-red-500/40 px-3.5 py-2.5 rounded-lg backdrop-blur text-red-200 text-xs font-mono shadow-xl flex flex-col gap-1 pointer-events-auto max-w-sm">
           <div className="flex items-center gap-2 font-bold text-white uppercase text-[10px] tracking-wider text-red-400">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             Delete Tool active
@@ -3580,7 +3746,7 @@ export default function ThreeCanvas({
       )}
 
       {setTargetMode && (
-        <div className="absolute top-14 left-4 z-40 bg-red-950/95 border border-red-500/40 px-3.5 py-2.5 rounded-lg backdrop-blur text-red-200 text-xs font-mono shadow-xl flex flex-col gap-1 pointer-events-auto max-w-sm">
+        <div className="absolute top-[128px] left-4 z-40 bg-red-950/95 border border-red-500/40 px-3.5 py-2.5 rounded-lg backdrop-blur text-red-200 text-xs font-mono shadow-xl flex flex-col gap-1 pointer-events-auto max-w-sm">
           <div className="flex items-center gap-2 font-bold text-white uppercase text-[10px] tracking-wider text-red-400">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             Set Target Mode Active
@@ -3592,18 +3758,48 @@ export default function ThreeCanvas({
         </div>
       )}
       
+      {/* 🧪 Extensible Active Config Tab Selector */}
+      <div 
+        className={`absolute top-4 left-4 z-40 p-1 rounded-xl backdrop-blur-md shadow-2xl flex items-center gap-1.5 pointer-events-auto select-none border ${
+          theme === 'light' 
+            ? 'bg-white border-slate-200/90 shadow-slate-100' 
+            : 'bg-[#1a1f2c]/95 border-white/10'
+        }`} 
+        id="viewport-tab-selector"
+      >
+        {([
+          { id: 'MG996R', label: 'MG996R Tab' },
+          { id: 'ST3215', label: 'ST3215 Tab' }
+        ] as const).map((tabOpt) => {
+          const isActive = activeTab === tabOpt.id;
+          return (
+            <button
+              key={tabOpt.id}
+              onClick={() => onTabChange?.(tabOpt.id)}
+              className={`px-3 py-1.5 h-7 font-sans font-extrabold text-[10px] uppercase tracking-wider rounded-lg transition-all duration-300 flex items-center justify-center cursor-pointer ${
+                isActive
+                  ? 'bg-sleek-blue text-white shadow shadow-blue-500/20'
+                  : theme === 'light'
+                    ? 'text-slate-800 hover:text-slate-900 bg-slate-100 hover:bg-slate-200'
+                    : 'text-white/40 hover:text-white/80 bg-white/5 hover:bg-white/10'
+              }`}
+              id={`viewport-tab-select-${tabOpt.id.toLowerCase()}`}
+            >
+              {tabOpt.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Viewport Floating Watermark / Status Header */}
-      <div className="absolute top-4 left-4 flex flex-col gap-1 pointer-events-none z-10 select-none" id="viewport-id-watermark">
+      <div className="absolute top-[68px] left-4 flex flex-col gap-1 pointer-events-none z-10 select-none" id="viewport-id-watermark">
         <span className={`text-[10px] font-mono uppercase tracking-[0.2em] font-bold ${
           theme === 'light' ? 'text-slate-900/50' : 'text-white/40'
-        }`}>VIEWPORT / PERSPECTIVE</span>
-        <span className={`text-xs font-semibold font-mono ${
-          theme === 'light' ? 'text-slate-900/70' : 'text-white/60'
-        }`}>LEG_ASSEMBLY_01.LNK</span>
+        }`}>VIEWPORT / SCHEMATIC</span>
       </div>
 
       {ikActive && (
-        <div className="absolute top-14 left-4 pointer-events-none bg-emerald-950/80 border border-emerald-500/30 px-3 py-1.5 rounded-md backdrop-blur text-emerald-400 text-xs font-mono uppercase tracking-wider flex items-center gap-2 z-10 shadow-lg">
+        <div className="absolute top-[128px] left-4 pointer-events-none bg-emerald-950/80 border border-emerald-500/30 px-3 py-1.5 rounded-md backdrop-blur text-emerald-400 text-xs font-mono uppercase tracking-wider flex items-center gap-2 z-10 shadow-lg">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           Dragging Target Mode (IK Resolving)
         </div>
